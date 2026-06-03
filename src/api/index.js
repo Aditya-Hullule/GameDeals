@@ -1,4 +1,4 @@
-const BACKEND_BASE = 'http://localhost:3000/api';
+const BACKEND_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // --- CHEAPSHARK API (Proxied through Backend) ---
 export const fetchDeals = async (options = {}) => {
