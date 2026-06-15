@@ -6,13 +6,8 @@ mongoose.connect(mongoURI)
   .then(() => console.log('Connected to MongoDB.'))
   .catch(err => console.error('Error connecting to MongoDB:', err.message));
 
-const UserSchema = new mongoose.Schema({
-  username: { type: String, unique: true, required: true },
-  password: { type: String, required: true }
-});
-
 const ListItemSchema = new mongoose.Schema({
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  user_id: { type: String, required: true },
   dealID: { type: String, required: true },
   title: { type: String, required: true },
   thumb: String,
@@ -23,13 +18,11 @@ const ListItemSchema = new mongoose.Schema({
 // Compound unique index to mimic SQLite's UNIQUE(user_id, dealID)
 ListItemSchema.index({ user_id: 1, dealID: 1 }, { unique: true });
 
-const User = mongoose.model('User', UserSchema);
 const Waitlist = mongoose.model('Waitlist', ListItemSchema);
 const Collection = mongoose.model('Collection', ListItemSchema);
 
 module.exports = {
   db: mongoose.connection,
-  User,
   Waitlist,
   Collection
 };

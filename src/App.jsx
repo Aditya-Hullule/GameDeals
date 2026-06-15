@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import DealCard from './components/DealCard';
-import { fetchDeals, login, register, getList, addToList, removeFromList, fetchStores, fetchAIInsights } from './api';
+import { fetchDeals, getList, addToList, removeFromList, fetchStores, fetchAIInsights, deleteAccount } from './api';
+import { useUser, useAuth, useClerk, SignIn, SignUp } from '@clerk/clerk-react';
 import './App.css';
 
 function App() {
@@ -15,12 +16,20 @@ function App() {
   const [activeTab, setActiveTab] = useState('deals'); // deals, waitlist, collection
   const [theme, setTheme] = useState('dark');
   
-  const [user, setUser] = useState(null);
+  const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const { openSignIn, signOut } = useClerk();
+
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // login or register
-  const [authUsername, setAuthUsername] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authError, setAuthError] = useState('');
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [usernameSuccess, setUsernameSuccess] = useState('');
+  
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filter state
   const [priceRange, setPriceRange] = useState(50);
@@ -49,11 +58,6 @@ function App() {
   const [aiCache, setAiCache] = useState({});
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
     const storedTheme = localStorage.getItem('theme');
     if (storedTheme) {
       setTheme(storedTheme);
@@ -182,55 +186,36 @@ function App() {
 
   const loadUserLists = async () => {
     try {
-      const wl = await getList('waitlist');
+      const token = await getToken();
+      const wl = await getList('waitlist', token);
       setWaitlist(wl);
-      const col = await getList('collection');
+      const col = await getList('collection', token);
       setCollection(col);
     } catch (error) {
       console.error("Failed to load user lists", error);
     }
   };
 
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-    try {
-      let data;
-      if (authMode === 'login') {
-        data = await login(authUsername, authPassword);
-      } else {
-        data = await register(authUsername, authPassword);
-        // auto login after register
-        data = await login(authUsername, authPassword);
-      }
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      setUser(data.user);
-      setShowAuthModal(false);
-      setAuthUsername('');
-      setAuthPassword('');
-    } catch (error) {
-      setAuthError(error.message);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+  const handleLogout = async () => {
+    await signOut();
     setShowProfileDrawer(false);
     if (activeTab !== 'deals') setActiveTab('deals');
   };
 
   const handleToggleWaitlist = async (deal) => {
-    if (!user) return setShowAuthModal(true);
+    if (!isSignedIn) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
     const inList = waitlist.find(item => item.dealID === deal.dealID);
     try {
+      const token = await getToken();
       if (inList) {
-        await removeFromList('waitlist', deal.dealID);
+        await removeFromList('waitlist', deal.dealID, token);
         setWaitlist(waitlist.filter(item => item.dealID !== deal.dealID));
       } else {
-        await addToList('waitlist', deal);
+        await addToList('waitlist', deal, token);
         setWaitlist([...waitlist, deal]);
       }
     } catch (error) {
@@ -239,18 +224,62 @@ function App() {
   };
 
   const handleToggleCollection = async (deal) => {
-    if (!user) return setShowAuthModal(true);
+    if (!isSignedIn) {
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
     const inList = collection.find(item => item.dealID === deal.dealID);
     try {
+      const token = await getToken();
       if (inList) {
-        await removeFromList('collection', deal.dealID);
+        await removeFromList('collection', deal.dealID, token);
         setCollection(collection.filter(item => item.dealID !== deal.dealID));
       } else {
-        await addToList('collection', deal);
+        await addToList('collection', deal, token);
         setCollection([...collection, deal]);
       }
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const handleUpdateUsername = async (e) => {
+    e.preventDefault();
+    setUsernameError('');
+    setUsernameSuccess('');
+    if (!newUsername.trim()) {
+      setUsernameError('Username cannot be empty');
+      return;
+    }
+    try {
+      await user.update({ username: newUsername.trim() });
+      setUsernameSuccess('Username updated successfully!');
+      setIsEditingUsername(false);
+    } catch (err) {
+      console.error('Error updating username:', err);
+      setUsernameError(err.errors?.[0]?.message || 'Failed to update username. Username may be taken.');
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    setShowDeleteConfirmModal(true);
+    setShowProfileDrawer(false);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const token = await getToken();
+      await deleteAccount(token);
+      setIsDeleting(false);
+      setShowDeleteConfirmModal(false);
+      await signOut();
+      if (activeTab !== 'deals') setActiveTab('deals');
+    } catch (err) {
+      console.error("Failed to delete account:", err);
+      setIsDeleting(false);
+      setShowDeleteConfirmModal(false);
     }
   };
 
@@ -466,21 +495,54 @@ function App() {
             <button onClick={() => { setActiveTab('deals'); setShowProfileDrawer(false); }} className={`nav-link ${activeTab === 'deals' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'deals' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
               🔥 Top Deals
             </button>
-            <button onClick={() => { if(user) { setActiveTab('waitlist'); setShowProfileDrawer(false); } else { setShowAuthModal(true); setShowProfileDrawer(false); } }} className={`nav-link ${activeTab === 'waitlist' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'waitlist' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
+            <button onClick={() => { if(isSignedIn) { setActiveTab('waitlist'); setShowProfileDrawer(false); } else { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); } }} className={`nav-link ${activeTab === 'waitlist' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'waitlist' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
               🕒 My Waitlist
             </button>
-            <button onClick={() => { if(user) { setActiveTab('collection'); setShowProfileDrawer(false); } else { setShowAuthModal(true); setShowProfileDrawer(false); } }} className={`nav-link ${activeTab === 'collection' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'collection' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
+            <button onClick={() => { if(isSignedIn) { setActiveTab('collection'); setShowProfileDrawer(false); } else { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); } }} className={`nav-link ${activeTab === 'collection' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'collection' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
               🎮 My Collection
             </button>
             
             <div style={{ marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '32px' }}>
-              {user ? (
+              {isSignedIn ? (
                 <div>
-                  <div className="logged-in-status">Logged in as <strong>{user.username}</strong></div>
-                  <button onClick={handleLogout} className="btn-primary" style={{ width: '100%' }}>Logout</button>
+                  <div className="logged-in-status" style={{ marginBottom: '16px' }}>
+                    {isEditingUsername ? (
+                      <form onSubmit={handleUpdateUsername} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="New username" 
+                          value={newUsername} 
+                          onChange={e => setNewUsername(e.target.value)}
+                          style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+                          required
+                        />
+                        {usernameError && <div style={{ color: '#ef4444', fontSize: '0.85rem' }}>{usernameError}</div>}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="submit" className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.9rem' }}>Save</button>
+                          <button type="button" onClick={() => { setIsEditingUsername(false); setUsernameError(''); }} className="reset-filters-btn" style={{ padding: '6px 12px', margin: 0, fontSize: '0.9rem' }}>Cancel</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                        <span style={{ fontSize: '0.95rem', wordBreak: 'break-all' }}>
+                          Logged in as <strong>{user?.username || user?.primaryEmailAddress?.emailAddress || 'User'}</strong>
+                        </span>
+                        <button 
+                          onClick={() => { setIsEditingUsername(true); setNewUsername(user?.username || ''); }} 
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', padding: '4px', display: 'flex', alignItems: 'center' }}
+                          title="Edit Username"
+                        >
+                          ✏️
+                        </button>
+                      </div>
+                    )}
+                    {usernameSuccess && <div style={{ color: '#10b981', fontSize: '0.85rem', marginTop: '8px' }}>{usernameSuccess}</div>}
+                  </div>
+                  <button onClick={handleLogout} className="btn-primary" style={{ width: '100%', marginBottom: '12px' }}>Logout</button>
+                  <button onClick={handleDeleteAccount} className="btn-primary" style={{ width: '100%', backgroundColor: '#ef4444', color: 'white' }}>Delete Account</button>
                 </div>
               ) : (
-                <button onClick={() => { setShowAuthModal(true); setShowProfileDrawer(false); }} className="btn-primary" style={{ width: '100%' }}>Login / Register</button>
+                <button onClick={() => { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); }} className="btn-primary" style={{ width: '100%' }}>Login / Register</button>
               )}
             </div>
           </div>
@@ -516,43 +578,7 @@ function App() {
         </section>
       </main>
 
-      {/* Auth Modal */}
-      {showAuthModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-        }}>
-          <div className="glass-panel" style={{ padding: '32px', borderRadius: '12px', width: '400px', maxWidth: '90%' }}>
-            <h2>{authMode === 'login' ? 'Login' : 'Register'}</h2>
-            {authError && <div style={{ color: '#ef4444', marginBottom: '16px' }}>{authError}</div>}
-            <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-              <input 
-                type="text" 
-                placeholder="Username" 
-                value={authUsername} 
-                onChange={e => setAuthUsername(e.target.value)}
-                style={{ padding: '10px', borderRadius: '4px', border: 'none' }}
-                required 
-              />
-              <input 
-                type="password" 
-                placeholder="Password" 
-                value={authPassword} 
-                onChange={e => setAuthPassword(e.target.value)}
-                style={{ padding: '10px', borderRadius: '4px', border: 'none' }}
-                required 
-              />
-              <button type="submit" className="btn-primary">{authMode === 'login' ? 'Login' : 'Create Account'}</button>
-            </form>
-            <div style={{ marginTop: '16px', textAlign: 'center' }}>
-              <button onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }} style={{ color: 'var(--bg-accent)' }}>
-                {authMode === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
-              </button>
-            </div>
-            <button onClick={() => setShowAuthModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', color: 'var(--text-main)' }}>✕</button>
-          </div>
-        </div>
-      )}
+
       {/* Compare Prices Modal */}
       {showCompareModal && (
         <div className="modal-overlay" onClick={() => setShowCompareModal(false)}>
@@ -663,6 +689,104 @@ function App() {
                   </section>
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Auth Modal with Clerk embedded components */}
+      {showAuthModal && (
+        <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
+          <div className="glass-panel" style={{ padding: '24px', borderRadius: 'var(--radius-lg)', border: 'none', overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: 'var(--bg-card)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: 'transparent' }}>
+              {authMode === 'login' ? (
+                <>
+                  <SignIn 
+                    routing="virtual"
+                    fallbackRedirectUrl="/"
+                    appearance={{
+                      layout: {
+                        showOptionalFields: false
+                      },
+                      elements: {
+                        footerAction: { display: 'none' },
+                        footer: { display: 'none' }
+                      }
+                    }}
+                  />
+                  <div style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Don't have an account?{' '}
+                    <button 
+                      onClick={() => setAuthMode('register')} 
+                      style={{ color: 'var(--deal-green)', fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Sign up
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <SignUp 
+                    routing="virtual"
+                    fallbackRedirectUrl="/"
+                    appearance={{
+                      layout: {
+                        showOptionalFields: false
+                      },
+                      elements: {
+                        footerAction: { display: 'none' },
+                        footer: { display: 'none' },
+                        formFieldRow__firstName: { display: 'none' },
+                        formFieldRow__lastName: { display: 'none' },
+                        formFieldRow__emailAddress: { display: 'none' },
+                        formField__firstName: { display: 'none' },
+                        formField__lastName: { display: 'none' },
+                        formField__emailAddress: { display: 'none' }
+                      }
+                    }}
+                  />
+                  <div style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Already have an account?{' '}
+                    <button 
+                      onClick={() => setAuthMode('login')} 
+                      style={{ color: 'var(--deal-green)', fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="close-modal-btn" onClick={() => setShowAuthModal(false)} style={{ top: '16px', right: '16px', zIndex: 10 }}>✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {showDeleteConfirmModal && (
+        <div className="modal-overlay" onClick={() => !isDeleting && setShowDeleteConfirmModal(false)}>
+          <div className="glass-panel" style={{ padding: '32px', borderRadius: 'var(--radius-lg)', width: '450px', maxWidth: '95%', textAlign: 'center', backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border-color)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: '800', fontFamily: 'var(--font-display)', marginBottom: '12px', color: 'var(--text-main)', marginTop: '8px' }}>Delete Account?</h3>
+            <p style={{ fontSize: '0.95rem', fontFamily: 'var(--font-body)', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '28px' }}>
+              Are you sure you want to permanently delete your account? This will delete your profile and all your waitlisted and collected games from our database. 
+              <span style={{ display: 'block', marginTop: '10px', color: 'var(--deal-red)', fontWeight: '700' }}>This action cannot be undone.</span>
+            </p>
+            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+              <button 
+                disabled={isDeleting}
+                onClick={confirmDeleteAccount} 
+                className="btn-primary" 
+                style={{ backgroundColor: 'var(--deal-red)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600', flex: 1 }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Account'}
+              </button>
+              <button 
+                disabled={isDeleting}
+                onClick={() => setShowDeleteConfirmModal(false)} 
+                style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1.5px solid var(--border-color)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600', flex: 1, transition: 'all var(--transition-fast)' }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

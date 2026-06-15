@@ -47,57 +47,44 @@ export const fetchAIInsights = async (title) => {
 
 // --- BACKEND API (Auth & Lists) ---
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+const getAuthHeaders = (token) => {
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 };
 
-export const login = async (username, password) => {
-  const response = await fetch(`${BACKEND_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error);
-  return data;
-};
-
-export const register = async (username, password) => {
-  const response = await fetch(`${BACKEND_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error);
-  return data;
-};
-
-export const getList = async (listName) => {
-  const response = await fetch(`${BACKEND_BASE}/${listName}`, { headers: getAuthHeaders() });
+export const getList = async (listName, token) => {
+  const response = await fetch(`${BACKEND_BASE}/${listName}`, { headers: getAuthHeaders(token) });
   if (!response.ok) throw new Error('Failed to fetch list');
   return await response.json();
 };
 
-export const addToList = async (listName, deal) => {
+export const addToList = async (listName, deal, token) => {
   const response = await fetch(`${BACKEND_BASE}/${listName}`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(token),
     body: JSON.stringify(deal)
   });
   if (!response.ok) throw new Error('Failed to add to list');
   return await response.json();
 };
 
-export const removeFromList = async (listName, dealID) => {
+export const removeFromList = async (listName, dealID, token) => {
   const response = await fetch(`${BACKEND_BASE}/${listName}/${encodeURIComponent(dealID)}`, {
     method: 'DELETE',
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(token)
   });
   if (!response.ok) throw new Error('Failed to remove from list');
   return await response.json();
+};
+
+export const deleteAccount = async (token) => {
+  const response = await fetch(`${BACKEND_BASE}/user`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(token)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to delete account');
+  return data;
 };
