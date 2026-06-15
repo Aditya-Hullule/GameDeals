@@ -1,46 +1,35 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const mongoose = require('mongoose');
 
-const dbPath = process.env.SQLITE_DB_PATH || path.resolve(__dirname, 'database.sqlite');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database', err.message);
-  } else {
-    console.log('Connected to the SQLite database.');
-    
-    // Create Users Table
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL
-    )`);
+const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/gamedeals';
 
-    // Create Waitlist Table
-    db.run(`CREATE TABLE IF NOT EXISTS waitlist (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      dealID TEXT NOT NULL,
-      title TEXT NOT NULL,
-      thumb TEXT,
-      salePrice REAL,
-      storeID TEXT,
-      FOREIGN KEY(user_id) REFERENCES users(id),
-      UNIQUE(user_id, dealID)
-    )`);
+mongoose.connect(mongoURI)
+  .then(() => console.log('Connected to MongoDB.'))
+  .catch(err => console.error('Error connecting to MongoDB:', err.message));
 
-    // Create Collection Table
-    db.run(`CREATE TABLE IF NOT EXISTS collection (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      dealID TEXT NOT NULL,
-      title TEXT NOT NULL,
-      thumb TEXT,
-      salePrice REAL,
-      storeID TEXT,
-      FOREIGN KEY(user_id) REFERENCES users(id),
-      UNIQUE(user_id, dealID)
-    )`);
-  }
+const UserSchema = new mongoose.Schema({
+  username: { type: String, unique: true, required: true },
+  password: { type: String, required: true }
 });
 
-module.exports = db;
+const ListItemSchema = new mongoose.Schema({
+  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  dealID: { type: String, required: true },
+  title: { type: String, required: true },
+  thumb: String,
+  salePrice: Number,
+  storeID: String
+});
+
+// Compound unique index to mimic SQLite's UNIQUE(user_id, dealID)
+ListItemSchema.index({ user_id: 1, dealID: 1 }, { unique: true });
+
+const User = mongoose.model('User', UserSchema);
+const Waitlist = mongoose.model('Waitlist', ListItemSchema);
+const Collection = mongoose.model('Collection', ListItemSchema);
+
+module.exports = {
+  db: mongoose.connection,
+  User,
+  Waitlist,
+  Collection
+};
