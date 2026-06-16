@@ -341,7 +341,7 @@ function App() {
       {/* Basic Navbar replacement to support tabs and auth easily */}
       <nav className="navbar">
         <div className="nav-brand">
-          <span>IsThere<span className="accent">Any</span>Deal</span>
+          <span>Loot<span className="accent">Scout</span></span>
         </div>
         
         {activeTab === 'deals' && (
