@@ -40,6 +40,9 @@ function App() {
   
   const [showFilters, setShowFilters] = useState(false);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  
+  const [currency, setCurrency] = useState(() => localStorage.getItem('lootscout_currency') || 'USD');
+  const [exchangeRate, setExchangeRate] = useState(94.89);
 
   // Stores metadata state
   const [storesMap, setStoresMap] = useState({});
@@ -84,6 +87,24 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.rates && data.rates.INR) {
+          setExchangeRate(data.rates.INR);
+          console.log("Fetched live exchange rate:", data.rates.INR);
+        }
+      })
+      .catch(err => console.error("Error fetching exchange rate:", err));
+  }, []);
+
+  const handleToggleCurrency = () => {
+    const nextCurrency = currency === 'USD' ? 'INR' : 'USD';
+    setCurrency(nextCurrency);
+    localStorage.setItem('lootscout_currency', nextCurrency);
+  };
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -321,6 +342,8 @@ function App() {
             onShowStores={handleShowCompare}
             onShowAI={handleShowAI}
             storesMap={storesMap}
+            currency={currency}
+            exchangeRate={exchangeRate}
           />
         ))}
       </div>
@@ -408,7 +431,7 @@ function App() {
           </div>
           
           <div className="filter-group">
-            <h3 className="filter-group-title">Max Price: ${priceRange}</h3>
+            <h3 className="filter-group-title">Max Price: {currency === 'INR' ? `₹${Math.round(priceRange * exchangeRate)}` : `$${priceRange}`}</h3>
             <input type="range" min="0" max="100" value={priceRange} onChange={(e) => setPriceRange(e.target.value)} style={{ width: '100%' }} />
           </div>
 
@@ -529,6 +552,22 @@ function App() {
               <span>My Collection</span>
             </button>
             
+            <button 
+              onClick={handleToggleCurrency} 
+              className="nav-link" 
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', padding: '12px', background: 'none', borderRadius: '8px', width: '100%', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
+            >
+              <img 
+                src={currency === 'USD' 
+                  ? `/usd_${theme === 'dark' ? 'white' : 'black'}.png` 
+                  : `/inr_${theme === 'dark' ? 'white' : 'black'}.png`
+                } 
+                alt="Currency" 
+                style={{ width: '20px', height: '20px', objectFit: 'contain' }} 
+              />
+              <span>Currency: {currency}</span>
+            </button>
+            
             <div style={{ marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '32px' }}>
               {isSignedIn ? (
                 <div>
@@ -636,7 +675,7 @@ function App() {
                           <span style={{ fontWeight: '600' }}>{storeName}</span>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ fontWeight: '800', color: 'var(--deal-green)', fontSize: '1.1rem' }}>${d.price}</span>
+                          <span style={{ fontWeight: '800', color: 'var(--deal-green)', fontSize: '1.1rem' }}>{currency === 'INR' ? `₹${(parseFloat(d.price) * exchangeRate).toFixed(2)}` : `$${d.price}`}</span>
                           <button onClick={() => window.open(`https://www.cheapshark.com/redirect?dealID=${d.dealID}`, '_blank', 'noopener,noreferrer')} className="visit-store-btn">
                             Visit Store
                           </button>

@@ -10,9 +10,20 @@ const DealCard = ({
   onShowStores, 
   onShowAI, 
   storesMap = {}, 
-  index = 0 
+  index = 0,
+  currency = 'USD',
+  exchangeRate = 1
 }) => {
   const { title, salePrice, normalPrice, savings, thumb, storeID, dealID, gameID, metacriticScore } = deal;
+  
+  const formatPrice = (priceStr) => {
+    const priceVal = parseFloat(priceStr);
+    if (isNaN(priceVal)) return 'N/A';
+    if (currency === 'INR') {
+      return `₹${(priceVal * exchangeRate).toFixed(2)}`;
+    }
+    return `$${priceVal.toFixed(2)}`;
+  };
   
   // Format savings to integer
   const discount = Math.round(parseFloat(savings));
@@ -97,9 +108,9 @@ const DealCard = ({
         <div className="price-section">
           <div>
             <span className="price-label">Deal Price</span>
-            <span className="sale-price">${parseFloat(salePrice).toFixed(2)}</span>
+            <span className="sale-price">{formatPrice(salePrice)}</span>
           </div>
-          <span className="normal-price">${parseFloat(normalPrice).toFixed(2)}</span>
+          <span className="normal-price">{formatPrice(normalPrice)}</span>
         </div>
 
         <div className="deal-card-actions">
