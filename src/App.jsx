@@ -492,14 +492,41 @@ function App() {
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button onClick={() => { setActiveTab('deals'); setShowProfileDrawer(false); }} className={`nav-link ${activeTab === 'deals' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'deals' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
-              🔥 Top Deals
+            <button 
+              onClick={() => { setActiveTab('deals'); setShowProfileDrawer(false); }} 
+              className={`nav-link ${activeTab === 'deals' ? 'active' : ''}`} 
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', padding: '12px', background: activeTab === 'deals' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
+            >
+              <img 
+                src={`/topdeals_${theme === 'dark' ? 'white' : 'black'}.png`} 
+                alt="Top Deals" 
+                style={{ width: '20px', height: '20px', objectFit: 'contain' }} 
+              />
+              <span>Top Deals</span>
             </button>
-            <button onClick={() => { if(isSignedIn) { setActiveTab('waitlist'); setShowProfileDrawer(false); } else { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); } }} className={`nav-link ${activeTab === 'waitlist' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'waitlist' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
-              🕒 My Waitlist
+            <button 
+              onClick={() => { if(isSignedIn) { setActiveTab('waitlist'); setShowProfileDrawer(false); } else { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); } }} 
+              className={`nav-link ${activeTab === 'waitlist' ? 'active' : ''}`} 
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', padding: '12px', background: activeTab === 'waitlist' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
+            >
+              <img 
+                src={`/waitlist_${theme === 'dark' ? 'white' : 'black'}.png`} 
+                alt="My Waitlist" 
+                style={{ width: '20px', height: '20px', objectFit: 'contain' }} 
+              />
+              <span>My Waitlist</span>
             </button>
-            <button onClick={() => { if(isSignedIn) { setActiveTab('collection'); setShowProfileDrawer(false); } else { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); } }} className={`nav-link ${activeTab === 'collection' ? 'active' : ''}`} style={{ textAlign: 'left', padding: '12px', background: activeTab === 'collection' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%' }}>
-              🎮 My Collection
+            <button 
+              onClick={() => { if(isSignedIn) { setActiveTab('collection'); setShowProfileDrawer(false); } else { setAuthMode('login'); setShowAuthModal(true); setShowProfileDrawer(false); } }} 
+              className={`nav-link ${activeTab === 'collection' ? 'active' : ''}`} 
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', padding: '12px', background: activeTab === 'collection' ? 'var(--bg-card-hover)' : 'none', borderRadius: '8px', width: '100%', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}
+            >
+              <img 
+                src={`/collection_${theme === 'dark' ? 'white' : 'black'}.png`} 
+                alt="My Collection" 
+                style={{ width: '20px', height: '20px', objectFit: 'contain' }} 
+              />
+              <span>My Collection</span>
             </button>
             
             <div style={{ marginTop: '32px', borderTop: '1px solid var(--border-color)', paddingTop: '32px' }}>
@@ -525,14 +552,18 @@ function App() {
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
                         <span style={{ fontSize: '0.95rem', wordBreak: 'break-all' }}>
-                          Logged in as <strong>{user?.username || user?.primaryEmailAddress?.emailAddress || 'User'}</strong>
+                          Logged in as &nbsp;<strong>{user?.username || user?.primaryEmailAddress?.emailAddress || 'User'}</strong>
                         </span>
                         <button 
                           onClick={() => { setIsEditingUsername(true); setNewUsername(user?.username || ''); }} 
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', padding: '4px', display: 'flex', alignItems: 'center' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                           title="Edit Username"
                         >
-                          ✏️
+                          <img 
+                            src={`/edit_${theme === 'dark' ? 'white' : 'black'}.png`} 
+                            alt="Edit Username" 
+                            style={{ width: '16px', height: '16px', objectFit: 'contain' }} 
+                          />
                         </button>
                       </div>
                     )}
